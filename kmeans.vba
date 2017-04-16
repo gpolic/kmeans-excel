@@ -6,11 +6,14 @@ Public Sub kmeans()
     Dim InitCentrRange As String: InitCentrRange = ActiveSheet.Range("C7").Value
     Dim InitialCentroids As Variant: InitialCentroids = ActiveSheet.Range(InitCentrRange)
     
+    Application.StatusBar = "   [ Initialize ]"
     Dim MaxIt As Integer: MaxIt = ActiveSheet.Range("MaxIt").Value
     Dim DataSht As String: DataSht = ActiveSheet.Range("C3").Value
     Dim DataRange As String: DataRange = ActiveSheet.Range("C4").Value
     Dim OutputRange As String: OutputRange = ActiveSheet.Range("C8").Value
     Dim X As Variant: X = Worksheets(DataSht).Range(DataRange)
+    
+    ' first pass
     Dim my_idx As Variant: my_idx = FindClosestCentroid(X, InitialCentroids)
     
     Dim K As Integer: K = UBound(InitialCentroids, 1)
@@ -19,12 +22,18 @@ Public Sub kmeans()
     
     Dim centroids As Variant
     Dim ii As Integer: ii = 1
+    
+    'Application.ScreenUpdating = False
+    
     For ii = 1 To MaxIt
+        Application.StatusBar = "   [ Pass:" + CStr(ii) + " ]"
         centroids = ComputeCentroids(X, my_idx, K)
         my_idx = FindClosestCentroid(X, centroids)
     Next ii
     
     Range(OutputRange).Resize(K, J).Value = centroids
+    
+    'Application.ScreenUpdating = True
     
     Dim ClusterOutputSht As String: ClusterOutputSht = ActiveSheet.Range("C5").Value
     Dim ClusterOutputRange As String: ClusterOutputRange = ActiveSheet.Range("C6").Value
@@ -98,5 +107,6 @@ Public Function ComputeCentroids(X As Variant, idx As Variant, K As Variant) As 
     Next ii
     ComputeCentroids = centroids
 End Function
+
 
 
