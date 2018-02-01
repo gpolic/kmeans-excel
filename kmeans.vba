@@ -1,90 +1,193 @@
 Option Base 1
 Option Explicit
 
-
 Public Sub kmeans()
-    Dim wksheet As Worksheet
-    Set wksheet = ActiveWorkbook.Worksheets("Start")
-    
-    Dim InitCentrRange As String: InitCentrRange = wksheet.Range("C7").Value
-    Dim InitialCentroids As Variant: InitialCentroids = wksheet.Range(InitCentrRange)
+    Dim wkSheet As Worksheet
+    Set wkSheet = ActiveWorkbook.Worksheets("Start")
 
-    Dim MaxIt As Integer: MaxIt = wksheet.Range("MaxIt").Value
-    Dim DataSht As String: DataSht = wksheet.Range("C3").Value
-    Dim DataRange As String: DataRange = wksheet.Range("C4").Value
-    Dim OutputRange As String: OutputRange = wksheet.Range("C8").Value
+    Dim MaxIt As Integer: MaxIt = wkSheet.Range("MaxIt").Value
+    Dim DataSht As String: DataSht = wkSheet.Range("InputSheet").Value
+    Dim DataRange As String: DataRange = wkSheet.Range("InputRange").Value
     Dim DataRecords As Variant: DataRecords = Worksheets(DataSht).Range(DataRange)      ' this holds all the data records
     Dim ClusterIndexes As Variant
-    
-    Dim K As Integer: K = UBound(InitialCentroids, 1)                  ' K is the number of clusters
-    Dim J As Integer: J = UBound(DataRecords, 2)                       ' J features in each record
-    Dim M As Integer: M = UBound(DataRecords, 1)                       ' M number of records
+    Dim J As Integer: J = UBound(DataRecords, 2)                        ' J features in each record
+    Dim M As Integer: M = UBound(DataRecords, 1)                        ' M number of records
+    Dim K As Integer: K = wkSheet.Range("Clusters").Value
     Dim Centroids As Variant
-    Dim ii As Integer
-    Dim ClustersUpdated As Integer: ClustersUpdated = 1         ' initially we have this >0, otherwise the loop wont execute
+    Dim counter As Integer
+    Dim ClustersUpdated As Integer: ClustersUpdated = 1                 ' initially we have this >0, otherwise the loop wont execute
     
-    Application.StatusBar = "   [ Initialize ]"
+    Application.StatusBar = "   [ Initialize. ]"
+
+Dim StartTime, SecondsElapsed As Double
+StartTime = Timer
+    
+    Dim InitialCentroidsCalc As Variant
+    InitialCentroidsCalc = ComputeInitialCentroidsCalc(DataRecords, K)
+
+'    Dim InitCentrRange As String: InitCentrRange = wkSheet.Range("C7").Value
+'    wkSheet.Range(InitCentrRange).Resize(K, J).Value = InitialCentroidsCalc
+    
+    Application.StatusBar = "   [ Start..     ]"
     'Application.ScreenUpdating = False
     
     ' First pass. The result returned from FindClosestCentroid is not really needed now
-    ii = FindClosestCentroid(DataRecords, InitialCentroids, ClusterIndexes)  ' assign each record(observation) in a initial cluster
+    counter = FindClosestCentroid(DataRecords, InitialCentroidsCalc, ClusterIndexes)         ' assign each record(observation) in a initial cluster
+    counter = 1
     
-    ii = 1
-    While ii <= MaxIt And ClustersUpdated > 0  ' We will process k-means until it is normalized or MaxIterations reached
-        Application.StatusBar = "   [ Pass:" + CStr(ii) + " ]"
-        Centroids = NewComputeCentroids(DataRecords, ClusterIndexes, K)         ' calculate new centroids for each cluster
-        ClustersUpdated = FindClosestCentroid(DataRecords, Centroids, ClusterIndexes)    ' assign each record in a cluster based on the new centroids
-        ii = ii + 1
+    While counter <= MaxIt And ClustersUpdated > 0                  ' We will process k-means until it is normalized or MaxIterations reached
+        Application.StatusBar = "   [ Pass: " + CStr(counter) + "     ]"
+        Centroids = OldComputeCentroids(DataRecords, ClusterIndexes, K)                    ' calculate new centroids for each cluster
+        ClustersUpdated = FindClosestCentroid(DataRecords, Centroids, ClusterIndexes)   ' assign each record in a cluster based on the new centroids
+        counter = counter + 1
     Wend
-    
-    Range(OutputRange).Resize(K, J).Value = Centroids
-    
     'Application.ScreenUpdating = True
     
-    Dim ClusterOutputSht As String: ClusterOutputSht = wksheet.Range("C5").Value
-    Dim ClusterOutputRange As String: ClusterOutputRange = wksheet.Range("C6").Value
-    
+    Dim ClusterOutputSht As String: ClusterOutputSht = wkSheet.Range("OutputSheet").Value        ' show the clusters assigned, on the output sheet/range
+    Dim ClusterOutputRange As String: ClusterOutputRange = wkSheet.Range("OutputRange").Value
     Worksheets(ClusterOutputSht).Range(ClusterOutputRange).Resize(M, 1).Value = WorksheetFunction.Transpose(ClusterIndexes)
     
-    Call ShowResult(DataRecords, ClusterIndexes, K)
+    Call ShowResult(DataRecords, ClusterIndexes, Centroids, K)
+    
+    Dim Distance As Double
+    Distance = CalculateDistances(DataRecords, Centroids, ClusterIndexes)
+    wkSheet.Range("C16").Value = Distance
+    
+SecondsElapsed = Round(Timer - StartTime, 2)
+'MsgBox "Time elapsed " & SecondsElapsed & " seconds", vbInformation
 End Sub
 
 
-Public Sub ShowResult(ByRef DataRecords As Variant, ByRef Cluster_Indexes As Variant, NumClusters As Integer)
-    Dim ResultSheet As Worksheet
-    Dim lRowLast, lColLast As Integer
-    Dim Rng As Range
-    Dim ClusterObjects() As Variant: ReDim ClusterObjects(NumClusters) As Variant
+Function CalculateDistances(ByRef DataRecords As Variant, ByRef Centroids As Variant, ByRef Cluster_Indexes As Variant) As Variant
+    Dim NumRecords As Integer: NumRecords = UBound(DataRecords, 1)          ' n data records
+    Dim NumColumns As Integer: NumColumns = UBound(DataRecords, 2)          ' features in each record
+    Dim NumClusters As Integer: NumClusters = UBound(Centroids, 1)          ' number of clusters
+    Dim Distance, DistanceSum As Double
     
-    Set ResultSheet = ActiveWorkbook.Worksheets("Result")
-    Dim NumRecords As Integer: NumRecords = UBound(DataRecords, 1)     ' number of data records
+    Dim DistanceInCluster() As Variant:   ReDim DistanceInCluster(NumClusters)
+    Dim clusterCounter, recordCounter, recordsInCluster As Integer
     
-    ' clear the old data in Result sheet
-    With ResultSheet
-        lRowLast = .UsedRange.Row + .UsedRange.Rows.Count - 1
-        lColLast = .UsedRange.Column + .UsedRange.Columns.Count - 1
-        Set Rng = .Range(.Range("B4"), .Cells(lRowLast, lColLast))
-    End With
-    Rng.ClearContents  ' delete contents without deleting the format
-    
-    Dim cluster As Integer
-    For cluster = 1 To NumClusters
-        ClusterObjects(cluster) = 0  ' initialize Cluster object count
-        ResultSheet.Cells(4, 1 + cluster).Value = cluster
-    Next cluster
+    For clusterCounter = 1 To NumClusters
+        recordsInCluster = 0
+        For recordCounter = 1 To NumRecords
+            If Cluster_Indexes(recordCounter) = clusterCounter Then
+                DistanceInCluster(clusterCounter) = DistanceInCluster(clusterCounter) + _
+                    EuclideanDistance(Application.Index(Centroids, clusterCounter, 0), Application.Index(DataRecords, recordCounter, 0), NumColumns)
+                recordsInCluster = recordsInCluster + 1
+            End If
+        Next recordCounter
+        'DistanceSum = DistanceSum + Sqr(DistanceInCluster(clusterCounter) / recordsInCluster)
+        DistanceSum = DistanceSum + DistanceInCluster(clusterCounter)
+    Next clusterCounter
+    CalculateDistances = DistanceSum
 
-    Dim ii As Integer
-    For ii = 1 To NumRecords
-        ClusterObjects(Cluster_Indexes(ii)) = ClusterObjects(Cluster_Indexes(ii)) + 1  ' for every record in this cluster, increase the counter
-    Next ii
+End Function
 
-    'ResultSheet.Range("B5").Resize(NumClusters).Value = ClusterObjects
-    ResultSheet.Range("B5").Resize(1, NumClusters).Value = ClusterObjects
+
+' Inspired from org.apache.commons.math3.ml.clustering.KMeansPlusPlusClusterer
+'
+Function ComputeInitialCentroidsCalc(ByRef DataRecords As Variant, NumClusters As Integer) As Variant
+
+    Dim NumRecords As Integer: NumRecords = UBound(DataRecords, 1)          ' n data records
+    Dim NumColumns As Integer: NumColumns = UBound(DataRecords, 2)          ' features in each record
+    Dim Taken() As Variant: ReDim Taken(NumRecords)
     
-End Sub
+    Dim InitialCentroidsCalc As Variant: ReDim InitialCentroidsCalc(NumClusters, NumColumns) As Variant
+    Dim minDistSquared As Variant: ReDim minDistSquared(NumRecords)
+    Dim counter As Integer
+    Dim CentroidsFound As Integer
+    Dim preventLoop As Boolean: preventLoop = True
+
+    Dim FirstCentroid As Variant: ReDim FirstCentroid(NumColumns)
+    Dim firstnum As Integer: firstnum = Int(Rnd * NumRecords) + 1            ' select first centroid by random from our data records
+    
+    For counter = 1 To NumColumns
+        FirstCentroid(counter) = DataRecords(firstnum, counter)     ' put this data record in FirstCentroid
+        InitialCentroidsCalc(1, counter) = FirstCentroid(counter)   ' and put it also in the array to be returned
+    Next counter
+    
+    Taken(firstnum) = 1         ' mark point as Taken
+    CentroidsFound = 1          ' we have one cluster center
+    
+    For counter = 1 To NumRecords
+        If Not counter = firstnum Then
+            Dim dist As Variant
+            dist = EuclideanDistance(FirstCentroid, Application.Index(DataRecords, counter, 0), NumColumns)
+            minDistSquared(counter) = dist * dist
+        End If
+    Next counter
+
+    ' main loop
+Do While CentroidsFound < NumClusters And preventLoop = True
+    Dim distSqSum As Variant: distSqSum = 0
+    
+    For counter = 1 To NumRecords  ' sum all the squared distances of the points not already taken
+        If Not Taken(counter) = 1 Then
+        distSqSum = distSqSum + minDistSquared(counter)
+        End If
+    Next counter
+
+    Dim R As Variant        ' add one new point. each point is chosen with probability proportional to D(x)2
+    R = Rnd * distSqSum
+
+    Dim nextpoint As Integer            ' the index of the next point to be added as cluster center
+    nextpoint = -1
+    
+    Dim sum As Variant
+    
+    For counter = 1 To NumRecords  ' scan through the dist squared distances until sum > R
+        If Not Taken(counter) = 1 Then
+            sum = sum + minDistSquared(counter)
+            If sum > R Then
+                nextpoint = counter
+                Exit For
+            End If
+        End If
+    Next counter
+    
+    If nextpoint = -1 Then  ' if a new point was not found yet. just pick the last available data record
+        For counter = NumRecords To 1
+            If Not Taken(counter) = 1 Then
+                nextpoint = counter
+            End If
+        Next counter
+    End If
+    
+    If nextpoint >= 0 Then                      ' we found the next cluster center !
+        CentroidsFound = CentroidsFound + 1
+        Taken(nextpoint) = 1                    ' mark the data record as Taken
+        For counter = 1 To NumColumns           ' copy the data in the array to be returned
+            InitialCentroidsCalc(CentroidsFound, counter) = DataRecords(nextpoint, counter)
+        Next counter
+            
+        If CentroidsFound < NumClusters Then    ' need to find more centroids. we will adjust the minSqDistance
+            For counter = 1 To NumRecords
+                If Not Taken(counter) = 1 Then
+                    Dim dist2 As Variant
+                    dist2 = EuclideanDistance(Application.Index(InitialCentroidsCalc, CentroidsFound, 0), Application.Index(DataRecords, counter, 0), NumColumns)
+                                                ' find the distance to the new centroid
+                    Dim d2 As Variant
+                    d2 = dist2 * dist2
+                    
+                    If d2 < minDistSquared(counter) Then        ' if the distance to the new centroid is lower than the previous then use it
+                        minDistSquared(counter) = d2
+                    End If
+                End If
+            Next counter
+        End If
+    Else                        ' there is no cluster center found
+        preventLoop = False     ' make sure that the while loop can terminate
+    End If
+Loop
+
+    ComputeInitialCentroidsCalc = InitialCentroidsCalc
+
+End Function
+    
+
 
 Public Function EuclideanDistance(X As Variant, Y As Variant, NumberOfObservations As Integer) As Double
-    Dim ii As Integer: ii = 1
+    Dim ii As Integer
     Dim RunningSumSqr As Double: RunningSumSqr = 0
     
     For ii = 1 To NumberOfObservations
@@ -96,39 +199,40 @@ End Function
 
 
 '
-' For each record DataRecords(ii) the result is calculated and placed in Cluster_Indexes(ii)
-' This number is the cluster were we placed the record
+' For each record in Data Records, find the closest Centroid (cluster)
+' The result is calculated and placed in Cluster_Indexes()
+' This number is the cluster were we placed the record. This is more effective than creating new Arrays with Clusters
 '
 Public Function FindClosestCentroid(ByRef DataRecords As Variant, ByRef Centroids As Variant, ByRef Cluster_Indexes As Variant) As Integer
-    Dim K As Integer: K = UBound(Centroids, 1)      ' number of clusters
-    Dim J As Integer: J = UBound(Centroids, 2)       ' number of columns (features)
+    Dim NumClusters As Integer: NumClusters = UBound(Centroids, 1)     ' number of clusters
+    Dim NumColumns As Integer: NumColumns = UBound(Centroids, 2)       ' number of columns (features)
     Dim NumRecords As Integer: NumRecords = UBound(DataRecords, 1)     ' number of data records
     Dim idx() As Variant: ReDim idx(NumRecords) As Variant
-    Dim ii As Integer: ii = 1
+    Dim counterR As Integer
     Dim cc As Integer: cc = 1
 
     Dim changeCounter As Integer: changeCounter = 0
 
-    For ii = 1 To NumRecords      ' for all records
+    For counterR = 1 To NumRecords      ' for all records
     
         Dim MinimumDistance As Double: MinimumDistance = 10000000
         Dim MinCluster As Variant
-        Dim Dist As Double: Dist = 0
-        For cc = 1 To K                    ' meassure distance to all centroids and assign to the minimum distance cluster
-            Dist = EuclideanDistance(Application.Index(DataRecords, ii, 0), Application.Index(Centroids, cc, 0), J)
-            If Dist < MinimumDistance Then
+        Dim dist As Double: dist = 0
+        For cc = 1 To NumClusters          ' calculate distance to all centroids and assign to the minimum distance cluster
+            dist = EuclideanDistance(Application.Index(DataRecords, counterR, 0), Application.Index(Centroids, cc, 0), NumColumns)
+            If dist < MinimumDistance Then
                 MinCluster = cc            ' this record will be assigned to cluster MinCluster when we find the min distance
-                MinimumDistance = Dist
+                MinimumDistance = dist
             End If
         Next cc                            ' check with next centroid / cluster
-        idx(ii) = MinCluster
+        idx(counterR) = MinCluster
         
         If Not (IsEmpty(Cluster_Indexes)) Then          ' check what is the difference with our  previous centroids - if any
-            If Not (Cluster_Indexes(ii) = idx(ii)) Then ' the old cluster index is not the same as the new one
-                changeCounter = changeCounter + 1       ' that means this data record has moved to another cluster
+            If Not (Cluster_Indexes(counterR) = idx(counterR)) Then ' the old cluster index is not the same as the new one
+                changeCounter = changeCounter + 1       ' indicate that a data record has moved to another cluster
             End If
         End If
-    Next ii                ' next record
+    Next counterR                ' next record
     FindClosestCentroid = changeCounter
     'MsgBox changeCounter, vbOKOnly
     
@@ -136,7 +240,80 @@ Public Function FindClosestCentroid(ByRef DataRecords As Variant, ByRef Centroid
 End Function
 
 
+'
+' After we have assigned each data record in a cluster (based on the distance) we will calculate new centroid for each cluster
+' For each data record that is in the cluster, we add and then average the features (columns)
+'
 Public Function ComputeCentroids(DataRecords As Variant, ClusterIdx As Variant, NoOfClusters As Variant) As Variant
+    Dim NumRecords As Integer: NumRecords = UBound(DataRecords, 1)
+    Dim NumColumns As Integer: NumColumns = UBound(DataRecords, 2)
+    Dim recordsCounter As Integer
+    Dim columnsCounter As Integer
+    Dim clusterCounter As Integer
+
+    Dim Centroids() As Variant: ReDim Centroids(NoOfClusters, NumColumns) As Variant    ' array of Centroids calculated
+    Dim Counters() As Integer: ReDim Counters(NoOfClusters) As Integer                  ' count the data records in a cluster
+    Dim ClusterNumber As Integer
+    
+    For recordsCounter = 1 To NumRecords            ' for every data record
+        ClusterNumber = ClusterIdx(recordsCounter)
+        
+        For columnsCounter = 1 To NumColumns        ' for every column
+            Centroids(ClusterNumber, columnsCounter) = Centroids(ClusterNumber, columnsCounter) + DataRecords(recordsCounter, columnsCounter)
+        Next columnsCounter                                                             ' find the sum of all observations
+        Counters(ClusterNumber) = Counters(ClusterNumber) + 1                           ' increase the counter of records in this cluster
+    Next recordsCounter
+    
+    For clusterCounter = 1 To NoOfClusters         ' find the averages
+        For columnsCounter = 1 To NumColumns
+            If (Counters(clusterCounter) > 0) Then
+                Centroids(clusterCounter, columnsCounter) = Centroids(clusterCounter, columnsCounter) / Counters(clusterCounter)
+            End If                                  ' divide the sum of values with the number of records in the cluster
+        Next columnsCounter
+    Next clusterCounter
+    
+    ComputeCentroids = Centroids        ' we have new centroids
+End Function
+
+
+' Show the results in the Result sheet
+'
+Public Sub ShowResult(ByRef DataRecords As Variant, ByRef Cluster_Indexes As Variant, ByRef Centroids, NumClusters As Integer)
+    Dim resultSheet As Worksheet
+    Dim lRowLast, lColLast As Integer
+    Dim Rng As Range
+    Dim ClusterObjects() As Variant: ReDim ClusterObjects(NumClusters) As Variant
+    
+    Set resultSheet = ActiveWorkbook.Worksheets("Result")
+    Dim NumRecords As Integer: NumRecords = UBound(DataRecords, 1)     ' number of data records
+    
+    ' clear the old data in Result sheet
+    With resultSheet
+        lRowLast = .UsedRange.Row + .UsedRange.Rows.Count - 1
+        lColLast = .UsedRange.Column + .UsedRange.Columns.Count - 1
+        Set Rng = .Range(.Range("B4"), .Cells(lRowLast, lColLast))
+    End With
+    Rng.ClearContents  ' delete contents without deleting the format
+    
+    Dim cluster As Integer
+    For cluster = 1 To NumClusters
+        ClusterObjects(cluster) = 0  ' initialize Cluster object count
+        resultSheet.Cells(4, 1 + cluster).Value = cluster
+    Next cluster
+
+    Dim ii As Integer
+    For ii = 1 To NumRecords
+        ClusterObjects(Cluster_Indexes(ii)) = ClusterObjects(Cluster_Indexes(ii)) + 1  ' for every record in this cluster, increase the counter
+    Next ii
+
+    resultSheet.Range("B5").Resize(1, NumClusters).Value = ClusterObjects
+    resultSheet.Range("B9").Resize(UBound(Centroids, 1), UBound(Centroids, 2)).Value = Centroids         ' Show the final centroids in the results
+    
+End Sub
+
+
+
+Public Function OldComputeCentroids(DataRecords As Variant, ClusterIdx As Variant, NoOfClusters As Variant) As Variant
     Dim NumRecords As Integer: NumRecords = UBound(DataRecords, 1)
     Dim RecordSize As Integer: RecordSize = UBound(DataRecords, 2)
     Dim ii As Integer: ii = 1
@@ -162,49 +339,86 @@ Public Function ComputeCentroids(DataRecords As Variant, ClusterIdx As Variant, 
             End If
         Next bb
     Next ii
-    ComputeCentroids = Centroids               ' we have new centroids
+    OldComputeCentroids = Centroids                           ' we have new centroids
     
 End Function
 
-'
-' After we have assigned each data record in a cluster (based on the distance) we will calculate new centroid for eacj cluster
-' For each data record that is in the cluster, we add and then average the features (columns)
-'
-Public Function NewComputeCentroids(DataRecords As Variant, ClusterIdx As Variant, NoOfClusters As Variant) As Variant
-    Dim NumRecords As Integer: NumRecords = UBound(DataRecords, 1)
-    Dim RecordSize As Integer: RecordSize = UBound(DataRecords, 2)
-    Dim ii As Integer: ii = 1
-    Dim cc As Integer: cc = 1
-    Dim bb As Integer: bb = 1
-    Dim counter As Integer: counter = 0
-    Dim tempSum() As Variant: ReDim tempSum(NoOfClusters, RecordSize) As Variant
-    Dim Centroids() As Variant: ReDim Centroids(NoOfClusters, RecordSize) As Variant
+
+
+
+' Calculate initial Centroids with Divide and Conquer
+' http://www.arpnjournals.org/jeas/research_papers/rp_2016/jeas_0116_3459.pdf
+' K number of clusters  1 < j < K  - NumClusters
+' n  number of records  1 < i < n  - NumRecords
+' G groups which contain n/k objects - groups
+' store in a array: GR (i,j)
+' create array GD = (GR(i,j) - diff)
+Function OldComputeInitialCentroidsCalc(ByRef DataRecords As Variant, NumClusters As Integer) As Variant
     
-    Dim Counters() As Integer: ReDim Counters(NoOfClusters, RecordSize) As Integer      ' count the data records in a cluster
-    Dim ClusterNumber As Integer
+    Dim NumRecords As Integer: NumRecords = UBound(DataRecords, 1)          ' n data records
+    Dim NumColumns As Integer: NumColumns = UBound(DataRecords, 2)        ' features in each record
+    Dim counter As Integer
+    Dim DiffMax() As Variant: ReDim DiffMax(NumColumns) As Variant
+    Dim DiffMin() As Variant: ReDim DiffMin(NumColumns) As Variant
+    Dim Difference() As Variant: ReDim Difference(NumColumns) As Variant
+    Dim GDistances() As Variant: ReDim GDistances(NumRecords, NumColumns) As Variant    ' array GD
+    Dim InitialCentroidsCalc As Variant: ReDim InitialCentroidsCalc(NumClusters, NumColumns) As Variant
     
-    For cc = 1 To NumRecords           ' for every observation (data record)
-        ClusterNumber = ClusterIdx(cc)
-        
-        For bb = 1 To RecordSize       ' for every feature (column)
-            Centroids(ClusterNumber, bb) = Centroids(ClusterNumber, bb) + DataRecords(cc, bb)   ' find the sum of all observations
-            Counters(ClusterNumber, bb) = Counters(ClusterNumber, bb) + 1
-        Next bb
-    Next cc
+    Dim groups As Variant: groups = NumRecords / NumClusters           ' create groups that contain n/k objects
     
-    For ii = 1 To NoOfClusters
-        For bb = 1 To RecordSize
-            If (Counters(ii, bb) > 0) Then
-                Centroids(ii, bb) = Centroids(ii, bb) / Counters(ii, bb)
+    For counter = 1 To NumColumns              ' initialize values
+        DiffMax(counter) = -9999999
+        DiffMin(counter) = 9999999
+        Difference(counter) = 0
+    Next counter
+
+    ' Find the Max and Min values for each data figure (Feature/Column)
+    Dim counterC, counterR As Integer
+    For counterC = 1 To NumColumns
+        For counterR = 1 To NumRecords
+            If DataRecords(counterR, counterC) > DiffMax(counterC) Then
+                DiffMax(counterC) = DataRecords(counterR, counterC)
             End If
-        Next bb
-    Next ii
+            If DataRecords(counterR, counterC) < DiffMin(counterC) Then
+                DiffMin(counterC) = DataRecords(counterR, counterC)
+            End If
+        Next counterR
+    Next counterC
     
-    NewComputeCentroids = Centroids                           ' we have new centroids
+    For counterC = 1 To NumColumns    ' We will calculate (Max - Min) / K, according to the paper
+        Difference(counterC) = DiffMax(counterC) - DiffMin(counterC)
+        Difference(counterC) = Difference(counterC) / NumClusters
+    Next counterC
     
+    'calculate the distance of each record/feature to the Difference, and create array GD
+    For counterR = 1 To NumRecords
+            For counterC = 1 To NumColumns
+                GDistances(counterR, counterC) = DataRecords(counterR, counterC) - Difference(counterC)
+            Next counterC
+    Next counterR
+    
+    Dim lower, upper As Integer                 ' work in each GD cluster group to find the mean
+    For counterR = 0 To NumClusters - 1
+        lower = (counterR * CInt(groups)) + 1   ' Split the total of NumRecords into Groups of size N/K
+        If (counterR = NumClusters - 1) Then    ' We calculate the lower and upper foreach group
+            upper = NumRecords
+        Else
+            upper = lower + groups - 1          ' lower and upper was calculated
+        End If
+        
+        For counter = lower To upper            ' find the totals for each feature in the group
+            For counterC = 1 To NumColumns
+                InitialCentroidsCalc(counterR + 1, counterC) = InitialCentroidsCalc(counterR + 1, counterC) + GDistances(counter, counterC)
+            Next counterC
+        Next counter
+        
+        For counterC = 1 To NumColumns   ' divide by number of members to get the mean of the group
+            InitialCentroidsCalc(counterR + 1, counterC) = InitialCentroidsCalc(counterR + 1, counterC) / (upper - lower + 1)
+        Next counterC
+        
+    Next counterR
+    
+    OldComputeInitialCentroidsCalc = InitialCentroidsCalc
 End Function
-
-
-
 
 
