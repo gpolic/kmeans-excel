@@ -1,4 +1,4 @@
-# k-means-excel
+# k-means
 
 K-means is an algorithm for cluster analysis (clustering). It is the process of partitioning a set of data into related groups / clusters.
 K-means clustering is useful for Data Mining and Business Intelligence.
@@ -6,21 +6,21 @@ K-means clustering is useful for Data Mining and Business Intelligence.
 Here is k-means in plain English:
 https://rayli.net/blog/data/top-10-data-mining-algorithms-in-plain-english/#2_k-means
 
-# What is this about
+# What does it do
 This is a k-means clustering implementation in VBA. The script is based on David Arthur and Sergei Vassilvitski k-means++, which chooses the initial centroids.
 
-The script works _only_ with numerical data.
+Currently the script works _only_ with numerical data.
 
 Each row of your excel data should be a record/observation with one or more features. Each column is a feature in the observation.
 
-As an example this is a data set of 25,000 children in Hong Kong with the height and weight: http://socr.ucla.edu/docs/resources/SOCR_Data/SOCR_Data_Dinov_020108_HeightsWeights.html
+As an example, this is a data set with the height and weight of 25,000 children in Hong Kong : http://socr.ucla.edu/docs/resources/SOCR_Data/SOCR_Data_Dinov_020108_HeightsWeights.html
 
 k-means will assign a number on each record indicating which groups it belongs to.
 
 You only need to provide the number of clusters/groups you want.
 
 
-# How does it work?
+# How does it work
 
 	Enter your data in a new Excel worksheet. 
 	Enter the name of the worksheet in cell C4, and the range of the data at C5
@@ -49,7 +49,6 @@ The script will stop execution when the clusters are normalized or when the maxi
 
 The example dataset is IRIS from UC Irvine Machine Learning Repository: https://archive.ics.uci.edu/ml/datasets.html
 
-The original VBA script is presented in bquanttrading blog: 
-https://quantmacro.wordpress.com/
+The original VBA script is the work of bquanttrading, https://quantmacro.wordpress.com/
 
 
