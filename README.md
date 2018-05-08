@@ -34,7 +34,7 @@ Currently the script works _only_ with numerical data.
 
 If you do not know the number of clusters/groups contained in your data, try different values for example 1 up to 10. 
 Execute the script several times and observe the GAP figure. 
-When the GAP is reaching a max value then, you have selected the appropriate number of clusters. In the example IRIS data set the GAP will maximise when we select 3 clusters.
+When GAP reaches its maximum value, you have selected the appropriate number of clusters. In the example IRIS data set the GAP will maximise when we select 3 clusters.
 	
 The original paper that describes the GAP calculation: https://web.stanford.edu/~hastie/Papers/gap.pdf
 	
@@ -57,9 +57,9 @@ The script will stop execution when the clusters are normalized or when the maxi
 # More info
 This is a k-means clustering implementation in VBA. The script is based in the work of bquanttrading, https://quantmacro.wordpress.com/
 
-It was enhanced with David Arthur and Sergei Vassilvitski k-means++ algorithm, which chooses the initial centroids.
+It is implementing David Arthur and Sergei Vassilvitski k-means++ algorithm, which chooses the initial centroids.
 https://theory.stanford.edu/~sergei/papers/kMeansPP-soda.pdf
 
-The example dataset is IRIS from UC Irvine Machine Learning Repository: https://archive.ics.uci.edu/ml/datasets.html
+The example dataset in kmeans.xlsx is IRIS from UC Irvine Machine Learning Repository: https://archive.ics.uci.edu/ml/datasets.html
 
 
