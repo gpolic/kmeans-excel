@@ -6,6 +6,9 @@ K-means clustering is useful for Data Mining and Business Intelligence.
 Here is k-means in plain English:
 https://rayli.net/blog/data/top-10-data-mining-algorithms-in-plain-english/#2_k-means
 
+This script is based on the work of bquanttrading at https://quantmacro.wordpress.com/
+
+
 # What does it do
 
 k-means will assign a number on each of your data records, indicating which groups it belongs to. You only need to provide the number of clusters/groups you want. After the calculations complete, each record will be assigned to one cluster. 
@@ -34,7 +37,9 @@ Currently the script works _only_ with numerical data.
 
 If you do not know the number of clusters/groups contained in your data, try different values for example 1 up to 10. 
 Execute the script several times and observe the GAP figure. 
-When GAP reaches its maximum value, you have selected the appropriate number of clusters. In the example IRIS data set the GAP will maximise when we select 3 clusters.
+When GAP reaches its maximum value, you have selected the appropriate number of clusters. 
+
+As an example, the IRIS data set the GAP will maximise when we select 3 clusters.
 	
 The original paper that describes the GAP calculation: https://web.stanford.edu/~hastie/Papers/gap.pdf
 	
@@ -55,9 +60,8 @@ The script will stop execution when the clusters are normalized or when the maxi
 
 
 # More info
-This is a k-means clustering implementation in VBA. The script is based in the work of bquanttrading, https://quantmacro.wordpress.com/
 
-It is implementing David Arthur and Sergei Vassilvitski k-means++ algorithm, which chooses the initial centroids.
+This is implementing David Arthur and Sergei Vassilvitski k-means++ algorithm, which chooses the initial centroids.
 https://theory.stanford.edu/~sergei/papers/kMeansPP-soda.pdf
 
 The example dataset in kmeans.xlsx is IRIS from UC Irvine Machine Learning Repository: https://archive.ics.uci.edu/ml/datasets.html
