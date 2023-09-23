@@ -4,7 +4,7 @@ K-means is an algorithm for cluster analysis (clustering). It is the process of 
 K-means clustering is useful for Data Mining and Business Intelligence.
 
 Here is k-means in plain English:
-https://rayli.net/blog/data/top-10-data-mining-algorithms-in-plain-english/#2_k-means
+https://hackerbits.com/data/k-means-data-mining-algorithm/
 
 This script is based on the work of bquanttrading. His blog on market modelling and market analytics:
 
@@ -72,6 +72,6 @@ It also provides an indication of the number of groups contained in the data, us
 This is implementing David Arthur and Sergei Vassilvitski k-means++ algorithm, which chooses the initial centroids.
 https://theory.stanford.edu/~sergei/papers/kMeansPP-soda.pdf
 
-The example dataset provided in kmeans.xlsx is _IRIS_ from UC Irvine Machine Learning Repository: https://archive.ics.uci.edu/ml/datasets.html
+The example dataset provided in kmeans.xlsx is _IRIS_ from UC Irvine Machine Learning Repository: https://archive.ics.uci.edu/dataset/53/iris
 
 
